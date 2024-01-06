@@ -70,6 +70,10 @@ class Fltk(Package):
         if "~gl" in spec:
             options.append("--disable-gl")
 
+        if spec.architecture.platform != "darwin":
+            # -arch <arch> commands only work on MacOS
+            options.append('--with-archflags=""')
+
         # FLTK needs to be built in-source
         configure(*options)
         make()
@@ -94,3 +98,4 @@ class Fltk(Package):
             filter_file(
                 'OPTIM="$OPTIM -fvisibility=hidden"', 'OPTIM="$OPTIM"', "configure", string=True
             )
+
