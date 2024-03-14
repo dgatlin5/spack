@@ -19,6 +19,7 @@ class Freecad(CMakePackage):
 
     license("LGPL-2.0-or-later")
 
+    version("0.21.2", sha256="ceaf77cd12e8ad533d1535cc27ae4ca2a6e80778502dc9cdec906415d674b674")
     version("0.20.2", sha256="46922f3a477e742e1a89cd5346692d63aebb2b67af887b3e463e094a4ae055da")
 
     depends_on("opencascade")
@@ -36,6 +37,7 @@ class Freecad(CMakePackage):
     depends_on("python")
     depends_on("gmsh+opencascade")
     depends_on("py-pyside2@1.2.4:", type=("build", "run"))
+    depends_on("py-pyside2@5:", when="@0.21.2:", type=("build", "run"))
     depends_on("py-matplotlib@3.0.2:", type=("build", "run"))
     depends_on("py-six@1.12.0:", type=("build", "run"))
     depends_on("py-markdown@3.2.2:", type=("build", "run"))
