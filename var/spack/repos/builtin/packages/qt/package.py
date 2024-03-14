@@ -24,7 +24,7 @@ class Qt(Package):
 
     # Supported releases: 'https://download.qt.io/official_releases/qt/'
     # Older archives: 'https://download.qt.io/new_archive/qt/'
-    url = "https://download.qt.io/archive/qt/5.15/5.15.2/single/qt-everywhere-src-5.15.2.tar.xz"
+    url = "https://download.qt.io/archive/qt/6.6/6.6.1/single/qt-everywhere-src-6.6.1.tar.xz"
     list_url = "https://download.qt.io/archive/qt/"
     list_depth = 3
     maintainers("sethrj")
@@ -33,6 +33,7 @@ class Qt(Package):
 
     license("LGPL-3.0-only")
 
+    version("6.6.1", sha256="dd3668f65645fe270bc615d748bd4dc048bd17b9dc297025106e6ecc419ab95d")
     version("5.15.12", sha256="93f2c0889ee2e9cdf30c170d353c3f829de5f29ba21c119167dee5995e48ccce")
     version("5.15.11", sha256="7426b1eaab52ed169ce53804bdd05dfe364f761468f888a0f15a308dc1dc2951")
     version("5.15.10", sha256="b545cb83c60934adc9a6bbd27e2af79e5013de77d46f5b9f5bb2a3c762bf55ca")
@@ -90,7 +91,7 @@ class Qt(Package):
     # Patches for qt@4:
     # https://github.com/spack/spack/issues/1517
     patch("qt4-pcre.patch", when="@4")
-    patch("qt5-pcre.patch", when="@5:")
+    patch("qt5-pcre.patch", when="@5")
     # https://bugreports.qt.io/browse/QTBUG-74196
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=89585
     patch("qt4-asm-volatile.patch", when="@4")
@@ -128,19 +129,19 @@ class Qt(Package):
         "https://src.fedoraproject.org/rpms/qt5-qtbase/raw/6ae41be8260f0f5403367eb01f7cd8319779674a/f/qt5-qtbase-gcc11.patch",
         sha256="9378afd071ad5c0ec8f7aef48421e4b9fab02f24c856bee9c0951143941913c5",
         working_dir="qtbase",
-        when="@5.14: %gcc@11:",
+        when="@5.14:5 %gcc@11:",
     )
     patch(
         "https://src.fedoraproject.org/rpms/qt5-qtdeclarative/raw/593481a2541d3218f285dd7b46bdc5f4c76075ab/f/qt5-qtdeclarative-gcc11.patch",
         sha256="2081e9cb85f6712be9b63c70204efa3da954c07d857283eeae16d1b0409704bd",
         working_dir="qtdeclarative",
-        when="@5.14: %gcc@11:",
+        when="@5.14:5 %gcc@11:",
     )
     patch(
         "https://src.fedoraproject.org/rpms/qt5-qtwebsockets/raw/f54f4ce6fa27941e9e6d606103d32056078edc74/f/qt5-qtwebsockets-gcc11.patch",
         sha256="84b099109d08adf177adf9d3542b6215ec3e42138041d523860dbfdcb59fdaae",
         working_dir="qtwebsockets",
-        when="@5.14: %gcc@11:",
+        when="@5.14:5 %gcc@11:",
     )
     # patch that adds missing `#include <cstdint>` in several files
     # required for gcc 13 (even though the original patch was developed for gcc 10)
@@ -149,7 +150,7 @@ class Qt(Package):
         "https://src.fedoraproject.org/rpms/qt5-qtlocation/raw/b6d99579de9ce5802c592b512a9f644a5e4690b9/f/qtlocation-gcc10.patch",
         sha256="78c70fbd0c74031c5f0f1f5990e0b4214fc04c5073c67ce1f23863373932ec86",
         working_dir="qtlocation",
-        when="@5.15.10: %gcc@10:",
+        when="@5.15.10:5 %gcc@10:",
     )
     # https://github.com/microsoft/vcpkg/issues/21055
     patch("qt5-macos12.patch", working_dir="qtbase", when="@5.14: %apple-clang@13:")
@@ -316,7 +317,9 @@ class Qt(Package):
         elif version >= Version("2.1"):
             url += "x11-"
 
-        if version >= Version("5.10.0"):
+        if version >= Version("6.0.0"):
+            url += "src-"
+        elif version >= Version("5.10.0"):
             if version >= Version("5.15.3"):
                 url += "opensource-src-"
             else:
@@ -331,7 +334,6 @@ class Qt(Package):
             url += str(version) + ".tar.xz"
         else:
             url += str(version) + ".tar.gz"
-
         return url
 
     def setup_build_environment(self, env):
@@ -545,7 +547,7 @@ class Qt(Package):
         config_args = [
             "-prefix",
             self.prefix,
-            "-v",
+            "-v" if version < Version("6") else "",
             "-opensource",
             "-{0}opengl".format("" if "+opengl" in spec else "no-"),
             "-{0}".format("debug" if "+debug" in spec else "release"),
@@ -762,6 +764,81 @@ class Qt(Package):
                 use_spack_dep("assimp")
             elif version >= Version("5.15"):
                 use_spack_dep("assimp", "quick3d-assimp")
+
+        if MACOS_VERSION and "+opengl" in spec:
+            # These options are only valid if 'multimedia' is enabled, i.e.
+            # +opengl is selected. Force them to be off on macOS, but let other
+            # platforms decide for themselves.
+            config_args.extend(["-no-pulseaudio", "-no-alsa"])
+
+        if spec.satisfies("platform=darwin target=aarch64:"):
+            # https://www.qt.io/blog/qt-on-apple-silicon
+            # Not currently working for qt@5
+            config_args.extend(["-device-option", "QMAKE_APPLE_DEVICE_ARCHS=arm64"])
+
+        configure(*config_args)
+
+    @when("@6")
+    def configure(self, spec, prefix):
+        config_args = self.common_config_args
+        version = self.version
+
+        config_args.extend(
+            [
+                "-no-eglfs",
+                "-no-directfb",
+                "-{0}gtk".format(
+                    "" if "+gtk" in spec else "no-"
+                ),
+            ]
+        )
+
+        use_spack_dep = self._dep_appender_factory(config_args)
+
+        if not MACOS_VERSION and "+gui" in spec:
+            # Linux-only QT5 dependencies
+            if "+opengl" in spec:
+                config_args.append("-I{0}/include".format(spec["libx11"].prefix))
+                config_args.append("-I{0}/include".format(spec["xproto"].prefix))
+
+        # If the version of glibc is new enough Qt will configure features that
+        # may not be supported by the kernel version on the system. This will
+        # cause errors like:
+        #   error while loading shared libraries: libQt5Core.so.5: cannot open
+        #   shared object file: No such file or directory
+        # Test the kernel version and disable features that Qt detects in glibc
+        # but that are not supported in the kernel as determined by information
+        # in: qtbase/src/corelib/global/minimum-linux_p.h.
+        if LINUX_VERSION:
+            if LINUX_VERSION < Version("3.16"):
+                config_args.append("-no-feature-renameat2")
+            if LINUX_VERSION < Version("3.17"):
+                config_args.append("-no-feature-getentropy")
+
+        config_args.extend(["-skip", "webengine"])
+
+        config_args.extend(["-skip", "wayland"])
+
+        if "~location" in spec:
+            config_args.extend(["-skip", "qtlocation"])
+
+        if "~opengl" in spec:
+            config_args.extend(["-skip", "multimedia"])
+            config_args.extend(["-skip", "qt3d"])
+
+            config_args.extend(["-skip", "webglplugin"])
+
+            # config_args.extend(["-skip", "qtquick3d"])
+            # config_args.extend(["-skip", "qtgraphs"])
+
+        else:
+            # v5.0: qt3d uses internal-only libassimp
+            # v5.5: external-only libassimp
+            # v5.6: either internal or external libassimp via autodetection
+            # v5.9: user-selectable internal-vs-external via -assimp
+            # v5.14: additional qtquick3d module uses -assimp
+            # v5.15: qtquick3d switched to the -quick3d-assimp option
+            use_spack_dep("assimp", "quick3d-assimp")
 
         if MACOS_VERSION and "+opengl" in spec:
             # These options are only valid if 'multimedia' is enabled, i.e.

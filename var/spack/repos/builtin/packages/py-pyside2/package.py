@@ -54,7 +54,7 @@ class PyPyside2(PythonPackage):
     depends_on("python@2.7.0:2.7,3.5.0:3.5,3.6.1:3.8", when="@:5.14", type=("build", "run"))
 
     depends_on("cmake@3.1:", type="build")
-    # libclang versioning from sources/shiboken2/doc/gettingstarted.rst
+    depends_on("py-libclang@10:")
     depends_on("llvm@6", type="build", when="@5.12:5.13")
     depends_on("llvm@10:", type="build", when="@5.15:")
     depends_on("py-setuptools", type="build")
@@ -64,7 +64,7 @@ class PyPyside2(PythonPackage):
     depends_on("py-wheel@:0.34", when="@:5.14", type="build")
     # in newer pip versions --install-option does not exist
     depends_on("py-pip@:23.0", type="build")
-    depends_on("qt@5.11:+opengl")
+    depends_on("qt@5:+opengl", when="@5")
 
     depends_on("graphviz", when="+doc", type="build")
     depends_on("libxml2@2.6.32:", when="+doc", type="build")
@@ -91,12 +91,13 @@ class PyPyside2(PythonPackage):
     def install_options(self, spec, prefix):
         args = [
             "--parallel={0}".format(make_jobs),
-            "--ignore-git",
             # if you want to debug build problems, uncomment this
             # "--verbose-build",
-            "--qmake={0}".format(spec["qt"].prefix.bin.qmake),
         ]
-        if spec.satisfies("^python@3.10:"):
+        if spec.version < Version("5.15"):
+            args.append("--ignore-git")
+            args.append("--qmake={0}".format(spec["qt"].prefix.bin.qmake))
+        if spec.satisfies("^python@3.10"):
             args.append("--limited-api=yes")
 
         if self.run_tests:
